@@ -1,74 +1,61 @@
 # Pomodoro
 
-A responsive, accessible timer with 25-minute focus sessions, 5-minute short breaks, 15-minute long breaks, pause/resume/reset, a progress ring, and optional desktop notifications. Built with Node.js 24 LTS, Express, and vanilla HTML/CSS/JavaScript. Express is the only direct dependency. No build step, database, external CDN, or credentials.
+Node.js **24 LTS**, Express, and vanilla HTML/CSS/JavaScript. Features 25/5/15-minute timers, pause/resume/reset, progress, optional notifications, and five locally synthesized ambient sounds with separate focus/break choices. No database, authentication, build step, CDN, or secrets. AI-assisted implementation with OpenAI Codex, **2026-10-18**.
 
-AI-assisted implementation with OpenAI Codex, dated **2026-10-18**. Application source files contain the same attribution.
+## Local setup
 
-## Run locally
-
-Install [Node.js 24 LTS](https://nodejs.org/en/download), then in this project:
+Install [Node.js 24 LTS](https://nodejs.org/en/download), then run from the project root:
 
 ```sh
-npm ci
+npm ci --ignore-scripts
 npm start
 ```
 
-Open **http://localhost:3000**. Stop with **Ctrl+C**. `npm run dev` restarts the server when server files change. If no lockfile has been generated yet, use `npm install` once instead of `npm ci`.
-
-If a project-local portable Node runtime was approved during setup, this PowerShell session can use it without changing system settings:
+Open **http://localhost:3000**; stop with **Ctrl+C**. `npm run dev` enables server watching. On this Windows checkout, the optional ignored portable runtime can be used in the current PowerShell session:
 
 ```powershell
 $env:Path = "$PWD\.tools\node;$env:Path"
 npm.cmd start
 ```
 
-To use another port in PowerShell:
+`PORT` defaults to 3000; in PowerShell, set another port with `$env:PORT = '8080'` before starting. Timer state survives reloads within a tab. Notifications need permission and HTTPS or localhost. Sound starts only with user interaction; after reloading a running timer, choose **Enable sound**. Browsers may suspend callbacks, audio, and notifications during device sleep; the countdown catches up on return.
 
-```powershell
-$env:PORT = '8080'
-npm start
+## Validation and GitHub Actions
+
+```sh
+npm run check
+npm test
+npm run smoke
 ```
 
-Run `npm run check` for syntax validation and `npm test` for timer and HTTP integration tests. Tests use Node's built-in test runner; there are no development dependencies.
+The smoke check runs the actual `npm start` command with `NODE_ENV=production` and an OS-assigned port, checks `/` and `/health`, and stops only the test process tree. No running development server needs to be stopped.
 
-## Use the timer
+`.github/workflows/ci.yml` performs a locked install and these checks on pushes and pull requests to `main`, or manually. It uses Node 24 from `.node-version` and needs no custom credentials. It validates only: it does not publish artifacts or deploy. A separate Deployment Center workflow does not automatically wait for this CI job.
 
-- Select Focus, Short break, or Long break, then Start. Pause preserves the remaining time; Reset restores the selected duration. Selecting another mode resets the current session.
-- Completed focus sessions are counted for this browser tab. After every fourth focus session, the next-session button offers a long break. Sessions never start automatically.
-- The countdown uses an absolute finish timestamp rather than counting ticks. Inactive tabs catch up when the browser runs again. State survives reloads in the same tab with session storage; storage failures do not prevent normal use. Each tab runs independently. Changing the device clock affects the deadline.
-- Enable **A gentle heads-up** to request browser notification permission. Notifications are off by default and require a supported browser on HTTPS or localhost. The operating system/browser may suppress or delay them while a tab or device is suspended. Completion is shown as soon as the page resumes. Closing the page stops notification delivery; there is no background service or push subscription.
-- Controls support keyboard navigation, visible focus outlines, reduced motion, and screen reader announcements for state changes without announcing every second.
+## Git repository
 
-## Ambient sounds
-
-Choose **Rain**, **Ocean**, **White noise**, **Pink noise**, or **Brown noise** under **Set the mood**. Focus and breaks have separate selections; both default to Off. Short and long breaks share the break sound. Adjust Volume or Mute at any time. Preferences are saved on this device when browser storage is available.
-
-Sounds start with the timer, fade out on pause/reset/completion, and switch to the selected break or focus sound when you start the next session. After reloading a running timer, select **Enable sound** to allow playback again. Browsers may suspend audio when a device sleeps or a tab is discarded. Playback uses [native Web Audio loops](https://developer.mozilla.org/en-US/docs/Web/API/AudioBufferSourceNode/loop), with the stop time scheduled on the audio clock so a throttled timer callback does not extend the sound. All five soundscapes are synthesized locally in the browser; there are no recordings, streaming requests, new dependencies, or audio files to deploy.
+This directory is a standalone repository. Existing remote: **https://github.com/dleontev/pomodoro.git**; branch: **main**, tracking **origin/main**. Keep `package-lock.json` committed. `.gitignore` excludes dependencies, portable tools, caches, generated output, environment files, cloud credentials, and private keys. `.gitattributes` normalizes text to LF. Review changes with `git status` and `git diff` before committing; staging, commits, and pushes remain manual until approved.
 
 ## Existing Azure App Service
 
-Target only the existing **`testwebapp-aztestprep`**. No Azure resources or deployment automation are created by this project. Its operating system and current configuration have not been inspected or changed.
+Target only **`testwebapp-aztestprep`**. Azure resources and configuration have not been inspected or changed during this preparation. The existing `.deployment` file is retained as a remote-build hint; it contains no credentials.
 
-Review these settings when deployment is explicitly approved:
+After approval:
 
-| Setting | Value |
+1. Commit and push the reviewed local changes to the existing GitHub repository.
+2. Open this existing app's **Deployment Center**, select **GitHub**, repository **dleontev/pomodoro**, branch **main**, and the **GitHub Actions** build provider. Review the proposed workflow before saving. Deployment Center generates and commits the deployment workflow; saving can also start a deployment. No competing deployment workflow is included here.
+3. Configure authentication only with approval. Prefer an existing approved identity with OpenID Connect when available. Do not create new Azure resources or commit credentials/publish profiles.
+4. Review the settings below and the generated workflow. Its Node version must be `24.x`; no frontend build command is required. Include `npm run check`, `npm test`, and `npm run smoke` in its build job before deployment if deployments must wait for validation.
+
+| Setting | Required value |
 | --- | --- |
-| Runtime stack | Node.js 24 LTS. Linux: `NODE\|24-lts`. Windows: `WEBSITE_NODE_DEFAULT_VERSION=~24`. |
-| Startup command (Linux) | `npm start` (runs `node server.js`). |
-| Application setting | `NODE_ENV=production`. |
-| Source/ZIP deployment with remote dependency installation | `SCM_DO_BUILD_DURING_DEPLOYMENT=true`. Include `package.json` and `package-lock.json` at the deployment root. |
-| Port | Leave platform-provided `PORT` intact. The server uses `process.env.PORT || 3000`, including Windows named pipes. |
-| HTTPS | Enable HTTPS Only for browser notifications on the deployed site. |
-| Health check path (optional) | `/health`. |
+| Runtime | Node.js 24 LTS; Linux: `NODE\|24-lts`; Windows: `WEBSITE_NODE_DEFAULT_VERSION=~24` |
+| Linux startup command | `npm start` → `node server.js` |
+| App environment | `NODE_ENV=production`; retain platform-provided `PORT` |
+| Source/ZIP remote build | Verify `SCM_DO_BUILD_DURING_DEPLOYMENT=true` so Azure installs dependencies |
+| HTTPS | HTTPS Only, for notifications on the deployed site |
+| Optional health check | `/health` |
 
-Deploy application source at the root, including `server.js`, `package.json`, `package-lock.json`, and `public/`. Exclude `.tools/`, `.npm-cache/`, local `node_modules/`, test output, and any `.env` files. There is no frontend compilation or build command. On Windows, Git/ZIP deployment with build automation generates IIS `web.config` from the start script/server entry point; other deployment methods require that file to be supplied separately.
+For source deployment with remote build, the package root must contain `server.js`, `package.json`, `package-lock.json`, `.deployment`, and `public/`. Exclude `.git/`, local tooling/caches, environment files, and credentials from deployment packages; `.gitignore` alone does not filter arbitrary ZIP uploads. Windows Git/ZIP deployment with build automation generates IIS `web.config`; other Windows deployment methods require supplying it separately.
 
-These settings follow [Microsoft's Node.js App Service configuration guide](https://learn.microsoft.com/en-us/azure/app-service/configure-language-nodejs). No credentials, publish profiles, or secrets belong in this repository. Deployment and Azure configuration changes require separate explicit approval.
-
-## Files
-
-- `server.js`: Express static server, security headers, `/health`, and shutdown handling.
-- `public/`: interface, styles, icon, browser controller, deadline-based timer, and ambient audio synthesis (`audio.js`).
-- `test/`: timing and HTTP integration regression checks.
-- `package.json` / `package-lock.json`: runtime requirements, scripts, and reproducible dependency versions.
-- `.gitignore`: local dependencies, tools, caches, editor state, and secrets excluded from Git.
+References: [Deployment Center and GitHub Actions](https://learn.microsoft.com/en-us/azure/app-service/deploy-github-actions), [Node.js App Service settings](https://learn.microsoft.com/en-us/azure/app-service/configure-language-nodejs).

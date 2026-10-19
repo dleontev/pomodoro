@@ -1,13 +1,54 @@
 # AI-assisted project setup, 2026-10-18.
+# Dependencies, portable tooling, and package-manager caches
 node_modules/
 .tools/
 .npm-cache/
+.cache/
+.npm/
+
+# Generated output and diagnostics
+dist/
+build/
+out/
 coverage/
+.nyc_output/
+test-results/
+playwright-report/
+tmp/
+temp/
 *.log
+*.log.*
+*.tsbuildinfo
+*.tgz
+*.zip
+report.*.json
+
+# Local environment, cloud credentials, and private signing material
 .env
 .env.*
 !.env.example
+.npmrc
+.azure/
+.aws/
+.ssh/
+.credentials/
+credentials/
+secrets/
+credentials*.json
+secrets*.json
+service-principal*.json
+local.settings.json
+*.[Pp]ublish[Ss]ettings
+*.[Pp]ublish[Pp]rofile
+*.pubxml
+*.pubxml.user
+*.pem
+*.key
+*.pfx
+*.p12
+
+# Machine-specific editor and operating-system files
 .DS_Store
 Thumbs.db
 .vscode/
-.azure/
+.idea/

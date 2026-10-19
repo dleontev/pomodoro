@@ -1,0 +1,45 @@
+# AI-assisted repository setup with OpenAI Codex, 2026-10-18.
+# Validation only. Azure Deployment Center owns the deployment workflow.
+name: Node.js CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js 24 LTS
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts --no-fund
+
+      - name: Check syntax
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify production startup
+        run: npm run smoke

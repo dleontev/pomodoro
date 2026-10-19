@@ -34,7 +34,10 @@ app.use((error, _request, response, _next) => {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = process.env.PORT || 3000;
   const server = app.listen(port, (error) => {
-    if (!error) console.log(`Pomodoro listening on ${port}`);
+    if (!error) {
+      const address = server.address();
+      console.log(`Pomodoro listening on ${typeof address === 'object' ? address.port : address}`);
+    }
   });
   server.on('error', (error) => {
     console.error('Unable to start Pomodoro:', error.message);
