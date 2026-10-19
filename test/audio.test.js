@@ -125,3 +125,50 @@ test('expired sessions never start audio', async () => {
   assert.equal(created(), 0);
   assert.equal(sources.length, 0);
 });
+
+// AI-assisted test additions with OpenAI Codex, 2026-10-19.
+test('only the latest sound starts after overlapping browser unlock requests', async () => {
+  const { audio, context, sources } = setup();
+  const unlocks = [];
+  context.resume = () => new Promise((resolve) => {
+    unlocks.push(() => { context.state = 'running'; resolve(); });
+  });
+  const first = audio.play('rain', 11000);
+  const latest = audio.play('ocean', 11000);
+  unlocks[1]();
+  await latest;
+  unlocks[0]();
+  await first;
+  assert.equal(sources.length, 1);
+  assert.equal(audio.active.sound, 'ocean');
+});
+
+test('a rejected stale unlock cannot interrupt a newer playing sound', async () => {
+  const { audio, context, sources } = setup();
+  let rejectUnlock;
+  context.resume = () => new Promise((_resolve, reject) => { rejectUnlock = reject; });
+  const first = audio.play('rain', 11000);
+  context.state = 'running';
+  await audio.play('brown', 11000);
+  rejectUnlock(new Error('Superseded browser unlock'));
+  await first;
+  assert.equal(sources.length, 1);
+  assert.equal(audio.active.sound, 'brown');
+  assert.equal(audio.isPlaying, true);
+});
+
+test('a session expiring while audio unlocks never creates a source', async () => {
+  const { audio, context, sources } = setup();
+  let now = 1000;
+  audio.now = () => now;
+  let unlock;
+  context.resume = () => new Promise((resolve) => {
+    unlock = () => { context.state = 'running'; resolve(); };
+  });
+  const playing = audio.play('white', 11000);
+  now = 11000;
+  unlock();
+  await playing;
+  assert.equal(sources.length, 0);
+  assert.equal(audio.isPlaying, false);
+});

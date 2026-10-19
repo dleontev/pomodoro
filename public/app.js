@@ -1,4 +1,8 @@
 // AI-assisted implementation with OpenAI Codex, 2026-10-18.
+// AI-assisted code
+// Purpose: Preserve keyboard focus when timer and audio controls change state.
+// Prepared for review by: Dimitriy Leontev
+// Generated: 2026-10-19
 import { MODES, PomodoroTimer, formatTime } from './timer.js';
 import { AmbientAudio, SOUNDS } from './audio.js';
 
@@ -47,6 +51,7 @@ function saveSoundPreferences() {
 }
 
 function updateSoundControl() {
+  const resumeHadFocus = document.activeElement === $('sound-resume');
   const sound = selectedSound();
   const wantsAudio = timer.phase === 'running' && sound !== 'off' && !soundPreferences.muted && soundPreferences.volume > 0;
   $('sound-volume-value').textContent = `${soundPreferences.volume}%`;
@@ -56,6 +61,7 @@ function updateSoundControl() {
   $('sound-mute').setAttribute('aria-label', soundPreferences.muted ? 'Unmute ambient sounds' : 'Mute ambient sounds');
   for (const id of ['focus-sound', 'break-sound', 'sound-volume', 'sound-mute']) $(id).disabled = !audioSupported;
   $('sound-resume').hidden = !audioSupported || !wantsAudio || ambient.isPlaying;
+  if (resumeHadFocus && $('sound-resume').hidden && audioSupported) $('sound-mute').focus();
   const status = !audioSupported ? 'Ambient sound is unavailable in this browser.'
     : audioError ? audioError
     : soundPreferences.muted ? 'Ambient sounds are muted.'
@@ -131,6 +137,7 @@ function finishSession() {
 }
 
 function render() {
+  const focusedControl = document.activeElement;
   const formatted = formatTime(timer.remainingMs);
   const elapsedPercent = (1 - timer.remainingMs / timer.duration) * 100;
   const progress = Math.floor(elapsedPercent);
@@ -159,6 +166,10 @@ function render() {
   [...$('session-dots').children].forEach((dot, index) => dot.classList.toggle('done', index < cycleCount));
   const title = timer.phase === 'complete' ? 'Session complete' : `${formatted} · ${MODES[timer.mode].label}`;
   if (document.title !== `${title} — Pomodoro`) document.title = `${title} — Pomodoro`;
+  // Move focus only when the user's current timer control becomes disabled.
+  if (['start', 'pause', 'reset'].includes(focusedControl?.id) && focusedControl.disabled) {
+    $(timer.phase === 'complete' ? 'next-session' : timer.phase === 'running' ? 'pause' : 'start').focus();
+  }
 }
 
 function refresh(now = Date.now()) {

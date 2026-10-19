@@ -1,3 +1,7 @@
+# AI-assisted code
+# Purpose: Validate source before publishing the deployment artifact.
+# Prepared for review by: Dimitriy Leontev
+# Generated: 2026-10-19
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
@@ -23,11 +27,25 @@ jobs:
         with:
           node-version: '24.x'
 
+      - name: Install locked dependencies for validation
+        run: npm ci --ignore-scripts --no-fund
+
+      - name: Check syntax
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Verify production startup
+        run: npm run smoke
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: |
+            .
+            !node_modules/**
 
   deploy:
     runs-on: ubuntu-latest

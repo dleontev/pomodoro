@@ -1,4 +1,8 @@
 /* AI-assisted implementation with OpenAI Codex, 2026-10-18. */
+/* AI-assisted code
+   Purpose: Keep explanatory sound text readable when audio is unavailable.
+   Prepared for review by: Dimitriy Leontev
+   Generated: 2026-10-19 */
 :root{color-scheme:light;--paper:#f8f7f3;--ink:#282d27;--muted:#666b60;--line:#e6e7df;--accent:#b6472b;--accent-hover:#933820;--soft:#f9eee8;--ring:#eeeae2;--green:#3d624d;font-family:Inter,"Segoe UI",Arial,sans-serif;font-synthesis:none}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased}
@@ -109,7 +113,6 @@ svg{display:block}
 .sound-mute[aria-pressed="true"]{background:var(--soft);color:var(--accent);border-color:var(--accent)}
 .sound-mute:hover:enabled{background:var(--soft)}
 .sound-status{font-size:10px;line-height:1.7;min-height:34px;margin:9px 0 0;color:var(--muted)}
-.sound-panel:has(select:disabled){opacity:.7}
 .site-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:44px;padding:23px 0 27px;border-top:1px solid var(--line);font-size:10px;color:var(--muted)}
 .site-footer>span:last-child{display:flex;align-items:center;gap:8px}
 .site-footer>span:last-child>span{font-size:17px;color:var(--accent)}

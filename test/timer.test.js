@@ -53,6 +53,33 @@ test('reload restores a running deadline including elapsed background time', () 
   assert.equal(restored.sync(400000), true);
 });
 
+// AI-assisted test additions with OpenAI Codex, 2026-10-19.
+test('reload preserves paused time without counting time away', () => {
+  const original = new PomodoroTimer();
+  original.start(1000);
+  original.pause(61000);
+  const restored = new PomodoroTimer(original.snapshot(), 4000000);
+  assert.equal(restored.phase, 'paused');
+  assert.equal(restored.remainingMs, 1440000);
+  assert.equal(restored.deadline, null);
+  assert.equal(restored.sync(5000000), false);
+  restored.start(5000000);
+  assert.equal(restored.deadline, 6440000);
+});
+
+test('switching a running session discards the previous deadline', () => {
+  const timer = new PomodoroTimer();
+  timer.start(1000);
+  timer.selectMode('short');
+  assert.equal(timer.phase, 'ready');
+  assert.equal(timer.remainingMs, MODES.short.duration);
+  assert.equal(timer.deadline, null);
+  assert.equal(timer.sync(2000000), false);
+  timer.start(2000000);
+  assert.equal(timer.sync(2300000), true);
+  assert.equal(timer.mode, 'short');
+});
+
 test('malformed stored state falls back safely', () => {
   for (const snapshot of [null, {}, { mode: '__proto__' }, { mode: 'focus', phase: 'paused', remainingMs: -1 }, { mode: 'short', phase: 'running', remainingMs: 100, deadline: Infinity }]) {
     const timer = new PomodoroTimer(snapshot);
