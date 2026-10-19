@@ -1,17 +1,20 @@
 // AI-assisted implementation with OpenAI Codex, 2026-10-18.
 // AI-assisted code
-// Purpose: Preserve keyboard focus when timer and audio controls change state.
+// Purpose: Coordinate accessible timer, audio, and persistent session-length controls.
 // Prepared for review by: Dimitriy Leontev
 // Generated: 2026-10-19
 import { MODES, PomodoroTimer, formatTime } from './timer.js';
 import { AmbientAudio, SOUNDS } from './audio.js';
+import { DEFAULT_DURATIONS, loadDurations, saveDurations, validateDurations } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 const sessionKey = 'pomodoro.session.v1';
 const notificationKey = 'pomodoro.notifications.v1';
 let saved;
 try { saved = JSON.parse(sessionStorage.getItem(sessionKey)); } catch { /* Storage may be blocked. */ }
-const timer = new PomodoroTimer(saved?.timer);
+let durationStorage;
+try { durationStorage = window.localStorage; } catch { /* Settings work for this visit without storage. */ }
+const timer = new PomodoroTimer(saved?.timer, Date.now(), loadDurations(durationStorage));
 let completedFocus = Number.isSafeInteger(saved?.completedFocus) && saved.completedFocus >= 0 ? saved.completedFocus : 0;
 let notificationsEnabled = false;
 try { notificationsEnabled = localStorage.getItem(notificationKey) === 'true'; } catch { /* Optional preference. */ }
@@ -156,6 +159,12 @@ function render() {
   $('reset').disabled = timer.phase === 'ready';
   $('start-label').textContent = timer.phase === 'paused' ? 'Resume' : timer.phase === 'complete' ? 'Start again' : timer.mode === 'focus' ? 'Start focus' : 'Start break';
   modeButtons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.mode === timer.mode)));
+  for (const mode of Object.keys(MODES)) $(`${mode}-minutes`).textContent = `${timer.durations[mode]} min`;
+  $('durations-summary').textContent = `${timer.durations.focus} / ${timer.durations.short} / ${timer.durations.long} min`;
+  const pending = ['running', 'paused'].includes(timer.phase) && timer.duration !== timer.durations[timer.mode] * 60000;
+  $('duration-pending').hidden = !pending;
+  $('duration-pending').textContent = pending
+    ? `Current ${MODES[timer.mode].label.toLowerCase()}: ${timer.duration / 60000} min. Next session or reset: ${timer.durations[timer.mode]} min.` : '';
   $('completion').hidden = timer.phase !== 'complete';
   if (timer.phase === 'complete') {
     $('completion-text').textContent = timer.mode === 'focus' ? 'Focus session complete. Nice work! Time for a break.' : 'Break complete. Ready for a fresh focus session?';
@@ -211,6 +220,46 @@ $('next-session').addEventListener('click', () => {
   void syncSound(true);
   $('pause').focus();
 });
+
+function fillDurationForm() {
+  for (const mode of Object.keys(MODES)) $(`duration-${mode}`).value = timer.durations[mode];
+}
+
+function showDurationErrors(errors = {}) {
+  for (const mode of Object.keys(MODES)) {
+    $(`duration-${mode}`).setAttribute('aria-invalid', String(Boolean(errors[mode])));
+    $(`duration-${mode}-error`).textContent = errors[mode] || '';
+    $(`duration-${mode}-error`).hidden = !errors[mode];
+  }
+}
+
+function applyDurations(durations, restored = false) {
+  refresh();
+  const active = ['running', 'paused'].includes(timer.phase);
+  timer.setDurations(durations);
+  const persisted = saveDurations(durationStorage, durations);
+  showDurationErrors();
+  fillDurationForm();
+  save();
+  render();
+  const message = restored ? 'Default lengths restored.' : 'Session lengths saved.';
+  $('duration-feedback').textContent = `${message}${active ? ' Your current session is unchanged.' : ''}${persisted ? '' : ' Browser storage is unavailable; these lengths apply for this visit.'}`;
+}
+
+$('duration-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const values = Object.fromEntries(Object.keys(MODES).map((mode) => [mode, $(`duration-${mode}`).value]));
+  const { durations, errors } = validateDurations(values);
+  showDurationErrors(errors);
+  if (!durations) {
+    $('duration-feedback').textContent = 'Check the highlighted session lengths. Your timer has not changed.';
+    $(`duration-${Object.keys(errors)[0]}`).focus();
+    return;
+  }
+  applyDurations(durations);
+});
+$('duration-defaults').addEventListener('click', () => applyDurations(DEFAULT_DURATIONS, true));
+fillDurationForm();
 
 for (const mode of ['focus', 'break']) {
   $(`${mode}-sound`).addEventListener('change', () => {

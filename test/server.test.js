@@ -23,7 +23,7 @@ test('Express serves the app and health check without exposing project files', a
   const head = await fetch(base, { method: 'HEAD' });
   assert.equal(head.status, 200);
   assert.equal(await head.text(), '');
-  for (const file of ['/app.js', '/timer.js', '/audio.js', '/styles.css', '/favicon.svg']) {
+  for (const file of ['/app.js', '/timer.js', '/settings.js', '/audio.js', '/styles.css', '/favicon.svg']) {
     const response = await fetch(base + file);
     assert.equal(response.status, 200, file);
   }
