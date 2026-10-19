@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- AI-assisted implementation with OpenAI Codex, 2026-10-18. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f8f7f3">
+  <meta name="description" content="Make room for your best work. A simple Pomodoro timer with focus sessions, breaks, and optional notifications.">
+  <title>Pomodoro — Make time for focus</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body data-mode="focus">
+  <a class="skip-link" href="#timer">Skip to timer</a>
+  <header class="site-header wrapper">
+    <a class="brand" href="/" aria-label="Pomodoro home">
+      <svg class="brand-mark" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="12" fill="currentColor"/><path d="M18 9v5m-3-5h6m5 7 2-2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="18" cy="22" r="8" fill="none" stroke="#fff" stroke-width="2"/><path d="M18 17v5l3 2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>pomodoro<span class="brand-dot">.</span></span>
+    </a>
+    <span class="header-note"><span class="tiny-spark" aria-hidden="true">✳</span> A little structure. A clearer mind.</span>
+  </header>
+
+  <main class="wrapper">
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">YOUR TIME, WELL SPENT</p>
+      <h1 id="page-title">Make room for <span>focus.</span></h1>
+      <p>One task at a time. One well-earned break.<br class="mobile-break"> Find your rhythm and let the rest wait.</p>
+    </section>
+
+    <div class="workspace">
+      <section class="timer-card" id="timer" tabindex="-1" aria-label="Pomodoro timer">
+        <div class="mode-picker" role="group" aria-label="Session type">
+          <button type="button" class="mode-button" data-mode="focus" aria-pressed="true">Focus <span>25 min</span></button>
+          <button type="button" class="mode-button" data-mode="short" aria-pressed="false">Short break <span>5 min</span></button>
+          <button type="button" class="mode-button" data-mode="long" aria-pressed="false">Long break <span>15 min</span></button>
+        </div>
+
+        <div class="timer-stage">
+          <div class="timer-ring">
+            <svg viewBox="0 0 300 300" aria-hidden="true">
+              <circle class="ring-track" cx="150" cy="150" r="139"/>
+              <circle class="ring-value" id="ring-value" cx="150" cy="150" r="139" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"/>
+            </svg>
+            <div class="timer-face">
+              <span class="session-label" id="session-label">TIME TO FOCUS</span>
+              <div class="time" id="time" role="timer" aria-live="off" aria-label="25 minutes remaining">25:00</div>
+              <span class="timer-status" id="timer-status"><span aria-hidden="true"></span><span id="status-text">Ready when you are</span></span>
+            </div>
+          </div>
+          <p class="timer-caption" id="timer-caption">A fresh start for the task that matters.</p>
+        </div>
+
+        <div id="session-progress" class="sr-only" role="progressbar" aria-label="Session progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+        <div class="timer-controls" role="group" aria-label="Timer controls">
+          <button class="button button-primary" id="start" type="button"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7 4 9 6-9 6z" fill="currentColor"/></svg><span id="start-label">Start focus</span></button>
+          <button class="button button-secondary" id="pause" type="button" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4h3v12H6zm5 0h3v12h-3z" fill="currentColor"/></svg>Pause</button>
+          <button class="button button-reset" id="reset" type="button" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 8a6 6 0 1 1 0 5M4 3v5h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Reset</button>
+        </div>
+
+        <div class="completion" id="completion" hidden>
+          <p id="completion-text">Session complete. Nice work!</p>
+          <button type="button" id="next-session" class="text-button">Start a short break <span aria-hidden="true">→</span></button>
+        </div>
+
+        <div class="notification-setting">
+          <svg class="bell" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <div><label for="notifications">A gentle heads-up</label><p id="notification-help">Notify me when a session ends</p></div>
+          <input type="checkbox" class="switch" id="notifications" aria-describedby="notification-help">
+        </div>
+        <noscript><p class="noscript">Enable JavaScript in your browser to use the timer.</p></noscript>
+      </section>
+
+      <aside class="rhythm-panel" aria-labelledby="rhythm-title">
+        <div class="aside-heading"><span class="eyebrow">A SIMPLE RHYTHM</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8a8 8 0 0 1 14-2l2 3m0-5v5h-5M19 16a8 8 0 0 1-14 2l-2-3m0 5v-5h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h2 id="rhythm-title">Good work has<br> breathing room.</h2>
+        <ol class="rhythm-steps">
+          <li><span class="step-number">01</span><div><h3>Settle into one thing <span>25 min</span></h3><p>Pick a task, clear the noise, and begin.</p></div></li>
+          <li><span class="step-number">02</span><div><h3>Take a little breather <span>5 min</span></h3><p>Stretch, get some water, look away.</p></div></li>
+          <li><span class="step-number">03</span><div><h3>Give yourself more space <span>15 min</span></h3><p>After four focus sessions, rest a little longer.</p></div></li>
+        </ol>
+        <div class="session-summary">
+          <div class="summary-heading"><h3>Your momentum</h3><span>THIS VISIT</span></div>
+          <div class="session-dots" id="session-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          <p id="focus-count">0 focus sessions completed</p>
+          <p class="summary-note">Small steps. Real progress.</p>
+        </div>
+        <section class="sound-panel" aria-labelledby="sound-title">
+          <div class="sound-heading">
+            <h3 id="sound-title">Set the mood</h3>
+            <span class="sound-badge">5 SOUNDS</span>
+          </div>
+          <p class="sound-intro">A little atmosphere for focus and rest.</p>
+          <div class="sound-selectors">
+            <div><label for="focus-sound">Focus sound</label><select id="focus-sound"><option value="off">Off</option><option value="rain">Rain</option><option value="ocean">Ocean</option><option value="white">White noise</option><option value="pink">Pink noise</option><option value="brown">Brown noise</option></select></div>
+            <div><label for="break-sound">Break sound</label><select id="break-sound"><option value="off">Off</option><option value="rain">Rain</option><option value="ocean">Ocean</option><option value="white">White noise</option><option value="pink">Pink noise</option><option value="brown">Brown noise</option></select></div>
+          </div>
+          <div class="sound-volume-heading"><label for="sound-volume">Volume</label><output id="sound-volume-value" for="sound-volume">30%</output></div>
+          <div class="sound-volume-controls">
+            <input id="sound-volume" type="range" min="0" max="100" value="30" step="1" aria-valuetext="30 percent">
+            <button id="sound-mute" class="sound-mute" type="button" aria-pressed="false">Mute</button>
+          </div>
+          <p id="sound-status" class="sound-status" role="status" aria-live="polite">Sounds are off. Choose one for focus or breaks.</p>
+          <button id="sound-resume" class="text-button" type="button" hidden>Enable sound</button>
+        </section>
+        <p class="manual-note"><span aria-hidden="true">↗</span> You choose when the next session begins.</p>
+      </aside>
+    </div>
+    <p id="announcer" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+  </main>
+  <footer class="site-footer wrapper"><span>A little less rush. A little more intention.</span><span>Made for your next small win <span aria-hidden="true">✳</span></span></footer>
+</body>
+</html>
