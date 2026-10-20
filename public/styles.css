@@ -81,6 +81,7 @@ main.wrapper { padding-bottom: 40px; }
 .session-setting input { width: 24px; height: 24px; margin: 10px; flex-shrink: 0; accent-color: var(--accent); }
 .session-setting label { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; cursor: pointer; }
 .session-setting p { font-size: .875rem; line-height: 1.5; color: var(--muted); }
+.session-setting input:disabled + div label { color: var(--muted); cursor: default; }
 .session-summary { border-top: 1px solid var(--line); padding-top: 16px; }
 .summary-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .session-dots { display: flex; gap: 6px; flex-shrink: 0; }
@@ -101,8 +102,11 @@ main.wrapper { padding-bottom: 40px; }
 .sound-volume-controls { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
 .sound-volume-controls input { flex: 1; min-width: 0; min-height: 48px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .sound-volume-controls .button { min-width: 88px; }
-#sound-mute[aria-pressed="true"] { background: var(--soft); color: var(--accent); border-color: var(--accent); }
+#sound-mute[aria-pressed="true"], #notification-mute[aria-pressed="true"] { background: var(--soft); color: var(--accent); border-color: var(--accent); }
 .sound-status { min-height: 45px; margin-top: 12px; }
+.notification-selector { grid-template-columns: minmax(0, 1fr); }
+.notification-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.notification-actions .button { flex: 1 1 120px; }
 .duration-panel summary { min-height: 48px; position: relative; list-style: none; padding-right: 28px; }
 .duration-panel summary::-webkit-details-marker { display: none; }
 .duration-panel summary::after { content: ""; position: absolute; right: 3px; top: 16px; width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); }
