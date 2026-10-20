@@ -1,21 +1,24 @@
 // AI-assisted implementation with OpenAI Codex, 2026-10-18.
 // AI-assisted code
-// Purpose: Coordinate accessible timer, audio, and persistent session-length controls.
+// Purpose: Coordinate accessible timer controls, completion feedback, and persistent preferences.
 // Prepared for review by: Dimitriy Leontev
 // Generated: 2026-10-19
 import { MODES, PomodoroTimer, formatTime } from './timer.js';
 import { AmbientAudio, SOUNDS } from './audio.js';
-import { DEFAULT_DURATIONS, loadDurations, saveDurations, validateDurations } from './settings.js';
+import { DEFAULT_DURATIONS, loadAutoSwitch, saveAutoSwitch, loadDurations, saveDurations, validateDurations } from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 const sessionKey = 'pomodoro.session.v1';
 const notificationKey = 'pomodoro.notifications.v1';
 let saved;
 try { saved = JSON.parse(sessionStorage.getItem(sessionKey)); } catch { /* Storage may be blocked. */ }
-let durationStorage;
-try { durationStorage = window.localStorage; } catch { /* Settings work for this visit without storage. */ }
-const timer = new PomodoroTimer(saved?.timer, Date.now(), loadDurations(durationStorage));
-let completedFocus = Number.isSafeInteger(saved?.completedFocus) && saved.completedFocus >= 0 ? saved.completedFocus : 0;
+let preferenceStorage;
+try { preferenceStorage = window.localStorage; } catch { /* Settings work for this visit without storage. */ }
+const timer = new PomodoroTimer(saved?.timer, Date.now(), loadDurations(preferenceStorage), {
+  autoSwitch: loadAutoSwitch(preferenceStorage), completedFocus: saved?.completedFocus
+});
+const autoSwitchToggle = $('auto-switch');
+autoSwitchToggle.checked = timer.autoSwitch;
 let notificationsEnabled = false;
 try { notificationsEnabled = localStorage.getItem(notificationKey) === 'true'; } catch { /* Optional preference. */ }
 const notificationsSupported = 'Notification' in window && window.isSecureContext;
@@ -100,13 +103,16 @@ async function syncSound(userGesture = false) {
 }
 
 function save() {
-  try { sessionStorage.setItem(sessionKey, JSON.stringify({ timer: timer.snapshot(), completedFocus })); } catch { /* Timer also works without storage. */ }
+  try { sessionStorage.setItem(sessionKey, JSON.stringify({ timer: timer.snapshot(), completedFocus: timer.completedFocus })); } catch { /* Timer also works without storage. */ }
 }
 
 function announce(message) { $('announcer').textContent = message; }
 
-function nextMode() {
-  return timer.mode === 'focus' ? (completedFocus > 0 && completedFocus % 4 === 0 ? 'long' : 'short') : 'focus';
+function completionMessage(mode) {
+  const message = mode === 'focus' ? 'Focus session complete. Nice work!' : `${MODES[mode].label} complete.`;
+  return timer.transitionFrom
+    ? `${message} ${MODES[timer.mode].label} selected. Press Start when you’re ready.`
+    : `${message} ${mode === 'focus' ? 'Time for a break.' : 'Ready for a fresh focus session?'}`;
 }
 
 function updateNotificationControl() {
@@ -120,12 +126,9 @@ function updateNotificationControl() {
       : notificationToggle.checked ? 'On — we’ll let you know when time is up' : 'Notify me when a session ends';
 }
 
-function finishSession() {
+function finishSession(completedMode) {
   ambient.stop();
-  if (timer.mode === 'focus') completedFocus += 1;
-  const message = timer.mode === 'focus'
-    ? 'Focus session complete. Nice work! Time for a break.'
-    : 'Break complete. Ready for a fresh focus session?';
+  const message = completionMessage(completedMode);
   $('completion-text').textContent = message;
   announce(message);
   save();
@@ -165,14 +168,14 @@ function render() {
   $('duration-pending').hidden = !pending;
   $('duration-pending').textContent = pending
     ? `Current ${MODES[timer.mode].label.toLowerCase()}: ${timer.duration / 60000} min. Next session or reset: ${timer.durations[timer.mode]} min.` : '';
-  $('completion').hidden = timer.phase !== 'complete';
-  if (timer.phase === 'complete') {
-    $('completion-text').textContent = timer.mode === 'focus' ? 'Focus session complete. Nice work! Time for a break.' : 'Break complete. Ready for a fresh focus session?';
-  }
-  $('next-session').textContent = `Start ${nextMode() === 'focus' ? 'a focus session' : nextMode() === 'long' ? 'a long break' : 'a short break'} →`;
-  $('focus-count').textContent = `${completedFocus} focus session${completedFocus === 1 ? '' : 's'} completed`;
-  const cycleCount = completedFocus === 0 ? 0 : ((completedFocus - 1) % 4) + 1;
-  [...$('session-dots').children].forEach((dot, index) => dot.classList.toggle('done', index < cycleCount));
+  const completedMode = timer.phase === 'complete' ? timer.mode : timer.transitionFrom;
+  $('completion').hidden = !completedMode;
+  if (completedMode) $('completion-text').textContent = completionMessage(completedMode);
+  $('next-session').hidden = timer.phase !== 'complete';
+  $('next-session').textContent = `Start ${timer.nextMode === 'focus' ? 'a focus session' : timer.nextMode === 'long' ? 'a long break' : 'a short break'} →`;
+  $('focus-count').textContent = `${timer.completedFocus} focus session${timer.completedFocus === 1 ? '' : 's'} completed`;
+  $('cycle-count').textContent = `${timer.cycleFocus} of 4 this cycle. A long break follows four focus sessions.`;
+  [...$('session-dots').children].forEach((dot, index) => dot.classList.toggle('done', index < timer.cycleFocus));
   const title = timer.phase === 'complete' ? 'Session complete' : `${formatted} · ${MODES[timer.mode].label}`;
   if (document.title !== `${title} — Pomodoro`) document.title = `${title} — Pomodoro`;
   // Move focus only when the user's current timer control becomes disabled.
@@ -182,9 +185,12 @@ function render() {
 }
 
 function refresh(now = Date.now()) {
-  if (timer.sync(now)) finishSession();
+  const completedMode = timer.mode;
+  const completed = timer.sync(now);
+  if (completed) finishSession(completedMode);
   render();
   updateSoundControl();
+  return completed;
 }
 
 $('start').addEventListener('click', () => {
@@ -216,9 +222,18 @@ modeButtons.forEach((button) => button.addEventListener('click', () => {
   save(); render(); updateSoundControl(); announce(`${MODES[timer.mode].label} selected. Timer ready.`);
 }));
 $('next-session').addEventListener('click', () => {
-  timer.selectMode(nextMode()); timer.start(); save(); refresh(); announce(`${MODES[timer.mode].label} started.`);
+  timer.selectMode(timer.nextMode); timer.start(); save(); refresh(); announce(`${MODES[timer.mode].label} started.`);
   void syncSound(true);
   $('pause').focus();
+});
+
+autoSwitchToggle.addEventListener('change', () => {
+  timer.autoSwitch = autoSwitchToggle.checked;
+  const persisted = saveAutoSwitch(preferenceStorage, timer.autoSwitch);
+  $('auto-switch-help').textContent = `Select the next session automatically. Timers always start manually.${persisted ? '' : ' This preference applies for this visit; browser storage is unavailable.'}`;
+  if (!refresh()) {
+    announce(`Auto-switch ${timer.autoSwitch ? 'on' : 'off'}. ${timer.autoSwitch ? 'New sessions wait for Start.' : 'Choose the next session yourself.'}`);
+  }
 });
 
 function fillDurationForm() {
@@ -237,7 +252,7 @@ function applyDurations(durations, restored = false) {
   refresh();
   const active = ['running', 'paused'].includes(timer.phase);
   timer.setDurations(durations);
-  const persisted = saveDurations(durationStorage, durations);
+  const persisted = saveDurations(preferenceStorage, durations);
   showDurationErrors();
   fillDurationForm();
   save();

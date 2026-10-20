@@ -7,7 +7,8 @@ A Pomodoro timer for focused work and regular breaks, with optional ambient soun
 ## Features
 
 - Customizable focus, short-break, and long-break sessions (25/5/15 minutes by default), with start, pause, resume, reset, and visual progress.
-- Completed focus sessions are counted; every fourth offers a long break. Each next session starts manually.
+- Optional **Auto-switch sessions** selects the next focus or break mode at completion. Every countdown still starts manually.
+- Focus completions are counted; every fourth in a cycle offers a long break. Completing a long break resets the cycle while preserving the total.
 - Rain, ocean, white noise, pink noise, and brown noise, with separate focus/break selections, volume, and mute.
 - Responsive layout, keyboard-accessible controls, visible focus indicators, and screen reader status announcements.
 
@@ -38,12 +39,14 @@ Open **http://localhost:3000**. `npm run dev` enables server watching. No applic
 
 Open **Session lengths** to save whole minutes: focus 1–120, breaks 1–60. Saved lengths apply immediately to a ready timer and to future sessions. A running or paused session keeps its original length and deadline, including after reload; **Reset** adopts the saved length. **Restore defaults** returns preferences to 25/5/15 without interrupting an active session. Preferences stay in this browser; storage failures fall back to settings for the current visit.
 
+**Auto-switch sessions** defaults to off and is saved in this browser. When on, focus completion selects a short break (a long break after four focus completions); either break returns to focus. The selected session waits for **Start**, so returning from sleep cannot launch a chain of sessions or start audio. Toggle changes affect the next completion, without revisiting an already completed session. Manual mode changes and resets cancel the current countdown without adding a completion. Cycle progress and the selected session survive reloads; completing a long break starts a new four-focus cycle.
+
 ## Automated validation
 
 | Command | Checks |
 | --- | --- |
 | `npm run check` | JavaScript syntax for the server, browser modules, and startup check. |
-| `npm test` | Node's built-in test runner: custom lengths, input validation and storage failures, timer transitions and restoration, noise generation and asynchronous audio lifecycle, HTTP responses, security headers, and POSIX shutdown. The signal test is skipped on Windows. |
+| `npm test` | Node's built-in test runner: custom lengths, input validation and storage failures, opt-in session transitions and cycle counts, pause/reload/duplicate-completion cases, noise generation and asynchronous audio lifecycle, HTTP responses, security headers, and POSIX shutdown. The signal test is skipped on Windows. |
 | `npm run smoke` | Runs the actual `npm start` command in production mode on a temporary port, checks `/` and `/health`, then stops the test process tree. |
 
 Audio lifecycle tests use Web Audio test doubles. Automated browser end-to-end tests and accessibility audits are not included.

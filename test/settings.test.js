@@ -4,7 +4,7 @@
 // Generated: 2026-10-19
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DURATIONS, loadDurations, saveDurations, validateDurations } from '../public/settings.js';
+import { DEFAULT_DURATIONS, loadAutoSwitch, saveAutoSwitch, loadDurations, saveDurations, validateDurations } from '../public/settings.js';
 
 test('session lengths accept whole minutes and reject invalid values atomically', () => {
   assert.deepEqual(validateDurations({ focus: '40', short: '7', long: '20' }).durations, { focus: 40, short: 7, long: 20 });
@@ -49,4 +49,29 @@ test('blocked storage falls back without preventing session-length changes', () 
   assert.deepEqual(loadDurations(undefined), DEFAULT_DURATIONS);
   assert.equal(saveDurations(storage, DEFAULT_DURATIONS), false);
   assert.equal(saveDurations(undefined, DEFAULT_DURATIONS), false);
+});
+
+test('auto-switch is opt-in, persists both states, and leaves duration preferences alone', () => {
+  const entries = new Map();
+  const storage = { getItem: (key) => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value) };
+  assert.equal(loadAutoSwitch(storage), false);
+  saveDurations(storage, { focus: 40, short: 7, long: 20 });
+  assert.equal(saveAutoSwitch(storage, true), true);
+  assert.equal(loadAutoSwitch(storage), true);
+  assert.equal(saveAutoSwitch(storage, false), true);
+  assert.equal(loadAutoSwitch(storage), false);
+  assert.deepEqual(loadDurations(storage), { focus: 40, short: 7, long: 20 });
+  assert.throws(() => saveAutoSwitch(storage, 'true'), TypeError);
+  assert.equal(loadAutoSwitch(storage), false);
+});
+
+test('missing, malformed, and blocked auto-switch preferences default safely to off', () => {
+  for (const stored of [null, '', 'false', 'TRUE', '1', '"true"', '{}']) {
+    assert.equal(loadAutoSwitch({ getItem: () => stored }), false);
+  }
+  const blocked = { getItem() { throw new Error('Blocked'); }, setItem() { throw new Error('Blocked'); } };
+  assert.equal(loadAutoSwitch(blocked), false);
+  assert.equal(loadAutoSwitch(undefined), false);
+  assert.equal(saveAutoSwitch(blocked, true), false);
+  assert.equal(saveAutoSwitch(undefined, false), false);
 });

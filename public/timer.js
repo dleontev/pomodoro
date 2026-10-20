@@ -1,6 +1,6 @@
 // AI-assisted implementation with OpenAI Codex, 2026-10-18.
 // AI-assisted code
-// Purpose: Support configurable lengths while preserving active session deadlines.
+// Purpose: Preserve session deadlines, completion counts, and opt-in mode transitions.
 // Prepared for review by: Dimitriy Leontev
 // Generated: 2026-10-19
 import { DEFAULT_DURATIONS, DURATION_LIMITS, validateDurations } from './settings.js';
@@ -12,8 +12,15 @@ export const MODES = Object.freeze({
 });
 
 export class PomodoroTimer {
-  constructor(snapshot, now = Date.now(), durations = DEFAULT_DURATIONS) {
+  constructor(snapshot, now = Date.now(), durations = DEFAULT_DURATIONS, options = {}) {
     this.durations = validateDurations(durations).durations || { ...DEFAULT_DURATIONS };
+    this.autoSwitch = options.autoSwitch === true;
+    const completedFocus = snapshot?.completedFocus ?? options.completedFocus;
+    this.completedFocus = Number.isSafeInteger(completedFocus) && completedFocus >= 0 ? completedFocus : 0;
+    const cycleFocus = snapshot?.cycleFocus;
+    this.cycleFocus = Number.isInteger(cycleFocus) && cycleFocus >= 0 && cycleFocus <= 4 && cycleFocus <= this.completedFocus
+      ? cycleFocus : this.completedFocus === 0 || (snapshot?.mode === 'long' && snapshot?.phase === 'complete')
+        ? 0 : ((this.completedFocus - 1) % 4) + 1;
     this.mode = 'focus';
     this.reset();
     if (!snapshot || !Object.hasOwn(MODES, snapshot.mode)) return;
@@ -26,7 +33,13 @@ export class PomodoroTimer {
     if (snapshot.phase === 'running' && (!Number.isFinite(snapshot.deadline) || snapshot.deadline > now + duration)) return;
     if (snapshot.phase === 'paused' && snapshot.remainingMs === 0) return;
     this.mode = snapshot.mode;
-    if (snapshot.phase === 'ready') { this.reset(); return; }
+    if (snapshot.phase === 'ready') {
+      this.reset();
+      const from = snapshot.transitionFrom;
+      const expectedMode = from === 'focus' ? (this.cycleFocus === 4 ? 'long' : 'short') : 'focus';
+      if (Object.hasOwn(MODES, from) && this.mode === expectedMode) this.transitionFrom = from;
+      return;
+    }
     this.sessionDurationMs = duration;
     this.phase = snapshot.phase;
     this.remainingMs = this.phase === 'complete' ? 0 : snapshot.remainingMs;
@@ -34,6 +47,10 @@ export class PomodoroTimer {
   }
 
   get duration() { return this.sessionDurationMs; }
+
+  get nextMode() {
+    return this.mode === 'focus' ? (this.cycleFocus === 4 ? 'long' : 'short') : 'focus';
+  }
 
   setDurations(values) {
     const { durations } = validateDurations(values);
@@ -49,6 +66,7 @@ export class PomodoroTimer {
   }
 
   reset() {
+    this.transitionFrom = null;
     this.sessionDurationMs = this.durations[this.mode] * 60000;
     this.phase = 'ready';
     this.remainingMs = this.duration;
@@ -58,6 +76,7 @@ export class PomodoroTimer {
   start(now = Date.now()) {
     if (this.phase === 'running') return;
     if (this.phase === 'complete') this.reset();
+    this.transitionFrom = null;
     this.deadline = now + this.remainingMs;
     this.phase = 'running';
   }
@@ -79,11 +98,25 @@ export class PomodoroTimer {
     if (this.remainingMs > 0) return false;
     this.phase = 'complete';
     this.deadline = null;
+    if (this.mode === 'focus') {
+      this.completedFocus = Math.min(Number.MAX_SAFE_INTEGER, this.completedFocus + 1);
+      this.cycleFocus = this.cycleFocus % 4 + 1;
+    } else if (this.mode === 'long') {
+      this.cycleFocus = 0;
+    }
+    if (this.autoSwitch) {
+      const from = this.mode;
+      this.selectMode(this.nextMode);
+      this.transitionFrom = from;
+    }
     return true;
   }
 
   snapshot() {
-    return { mode: this.mode, phase: this.phase, durationMs: this.duration, remainingMs: this.remainingMs, deadline: this.deadline };
+    return {
+      mode: this.mode, phase: this.phase, durationMs: this.duration, remainingMs: this.remainingMs, deadline: this.deadline,
+      completedFocus: this.completedFocus, cycleFocus: this.cycleFocus, transitionFrom: this.transitionFrom
+    };
   }
 }
 

@@ -76,10 +76,11 @@ main.wrapper { padding-bottom: 40px; }
 .text-button { min-height: 44px; border: 0; border-radius: 6px; padding: 8px 0; background: transparent; color: var(--accent); font-weight: 650; text-align: left; text-decoration: underline; text-underline-offset: 4px; }
 .completion, .notice { font-size: .875rem; line-height: 1.6; padding: 14px 16px; margin-top: 16px; border: 1px solid var(--accent); border-radius: 10px; background: var(--soft); }
 .completion p { font-size: 1rem; }
-.notification-setting { margin-top: 20px; padding-block: 18px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
-.notification-setting input { width: 24px; height: 24px; margin: 10px; flex-shrink: 0; accent-color: var(--accent); }
-.notification-setting label { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; cursor: pointer; }
-.notification-setting p { font-size: .875rem; line-height: 1.5; color: var(--muted); }
+.session-setting { margin-top: 20px; padding-block: 14px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+.session-setting + .session-setting { margin-top: 0; }
+.session-setting input { width: 24px; height: 24px; margin: 10px; flex-shrink: 0; accent-color: var(--accent); }
+.session-setting label { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; cursor: pointer; }
+.session-setting p { font-size: .875rem; line-height: 1.5; color: var(--muted); }
 .session-summary { border-top: 1px solid var(--line); padding-top: 16px; }
 .summary-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .session-dots { display: flex; gap: 6px; flex-shrink: 0; }
