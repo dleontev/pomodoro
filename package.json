@@ -10,7 +10,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check public/app.js && node --check public/timer.js && node --check public/settings.js && node --check public/audio.js && node --check public/notifications.js && node --check scripts/smoke.js",
+    "check": "node --check server.js && node --check public/app.js && node --check public/timer.js && node --check public/settings.js && node --check public/audio.js && node --check public/notifications.js && node --check scripts/smoke.js && node --check scripts/release.js",
     "smoke": "node scripts/smoke.js"
   },
   "dependencies": { "express": "^5.1.0" }

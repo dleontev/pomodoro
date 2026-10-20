@@ -1,0 +1,245 @@
+# AI-assisted release pipeline with OpenAI Codex, 2026-10-20.
+name: Release Pomodoro
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      rollback_run_id:
+        description: 'Optional successful release run ID whose retained artifact should be restored'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# Hold the lock through staging, approval, swap, and verification.
+concurrency:
+  group: pomodoro-release
+  cancel-in-progress: false
+
+env:
+  APP_NAME: testwebapp-aztestprep
+  RESOURCE_GROUP: res-group1
+  STAGING_ORIGIN: https://testwebapp-aztestprep-dev-acase5evh6g9eaa0.westus3-01.azurewebsites.net
+  PRODUCTION_ORIGIN: https://testwebapp-aztestprep-hzfye8fff2b5dxdj.westus3-01.azurewebsites.net
+  PUBLIC_ORIGIN: https://pomodoro.dleontev.com
+
+jobs:
+  prepare:
+    if: github.repository == 'dleontev/pomodoro' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - name: Check out approved workflow and source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node.js 24 LTS
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Validate current release tooling and application
+        run: |
+          npm ci --ignore-scripts --no-fund
+          npm run check
+          npm test
+          npm run smoke
+
+      - name: Select a retained rollback artifact
+        if: inputs.rollback_run_id != ''
+        id: rollback
+        shell: bash
+        env:
+          RUN_ID: ${{ inputs.rollback_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Use a numeric release run ID.'; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" > "$RUNNER_TEMP/source-run.json"
+          selected=$(node scripts/release.js source-run "$RUNNER_TEMP/source-run.json" "$GITHUB_REPOSITORY")
+          printf 'run_id=%s\n' "$selected" >> "$GITHUB_OUTPUT"
+
+      - name: Download the known-good source artifact
+        if: inputs.rollback_run_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pomodoro-release
+          path: ${{ runner.temp }}/release
+          run-id: ${{ steps.rollback.outputs.run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Package this main commit
+        if: inputs.rollback_run_id == ''
+        shell: bash
+        run: node scripts/release.js package "$GITHUB_WORKSPACE" "$RUNNER_TEMP/release" "$GITHUB_SHA"
+
+      - name: Verify the artifact and record its commit
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit=$(node scripts/release.js inspect "$RUNNER_TEMP/release")
+          git merge-base --is-ancestor "$commit" "$GITHUB_SHA" || { echo '::error::Release commit must be in main history.'; exit 1; }
+          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
+          printf '## Prepared release\n\nCommit: `%s`\n\nRetained artifact: `pomodoro-release` (90 days).\n' "$commit" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retain the verified release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pomodoro-release
+          path: ${{ runner.temp }}/release
+          retention-days: 90
+          if-no-files-found: error
+
+  stage:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: staging
+      url: https://testwebapp-aztestprep-dev-acase5evh6g9eaa0.westus3-01.azurewebsites.net
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out verification tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24 LTS
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Download the validated release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pomodoro-release
+          path: ${{ runner.temp }}/release
+      - name: Verify the staged package
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: node scripts/release.js inspect "$RUNNER_TEMP/release" "$RELEASE_COMMIT"
+      - name: Log in as the staging publisher
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Check the existing dev slot
+        shell: bash
+        env:
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          expected="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Web/sites/$APP_NAME/slots/dev"
+          slot=$(az webapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --slot dev --query id -o tsv --only-show-errors)
+          [[ "${slot,,}" == "${expected,,}" ]] || { echo '::error::Unexpected deployment target.'; exit 1; }
+          app_plan=$(az webapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query serverFarmId -o tsv --only-show-errors)
+          slot_plan=$(az webapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --slot dev --query serverFarmId -o tsv --only-show-errors)
+          [[ -n "$app_plan" && "${app_plan,,}" == "${slot_plan,,}" ]] || { echo '::error::Slot must share the existing plan.'; exit 1; }
+          auto_swap=$(az webapp config show -g "$RESOURCE_GROUP" -n "$APP_NAME" --slot dev --query autoSwapSlotName -o tsv --only-show-errors)
+          [[ -z "$auto_swap" ]] || { echo '::error::Automatic slot swapping must be disabled.'; exit 1; }
+      - name: Deploy exclusively to the staging slot
+        uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383 # v3
+        with:
+          app-name: testwebapp-aztestprep
+          resource-group-name: res-group1
+          slot-name: dev
+          package: ${{ runner.temp }}/release
+          clean: true
+      - name: Verify staging health and every frontend file
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if node scripts/release.js verify "$STAGING_ORIGIN" "$RUNNER_TEMP/release" "$RELEASE_COMMIT"; then
+              printf '## Staging verified\n\nCommit: `%s`\n\nInspect %s before approving production.\n' "$RELEASE_COMMIT" "$STAGING_ORIGIN" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::Staging did not pass release verification.'
+          exit 1
+
+  promote:
+    needs: [prepare, stage]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://pomodoro.dleontev.com
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out verification tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 24 LTS
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Download the approved release
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: pomodoro-release
+          path: ${{ runner.temp }}/release
+      - name: Confirm staging still serves the approved commit
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: node scripts/release.js verify "$STAGING_ORIGIN" "$RUNNER_TEMP/release" "$RELEASE_COMMIT"
+      - name: Log in as the production promoter
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Swap the approved dev release into production
+        run: az webapp deployment slot swap --resource-group "$RESOURCE_GROUP" --name "$APP_NAME" --slot dev --target-slot production --only-show-errors
+      - name: Verify production and its custom domain
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if node scripts/release.js verify "$PRODUCTION_ORIGIN" "$RUNNER_TEMP/release" "$RELEASE_COMMIT" &&
+               node scripts/release.js verify "$PUBLIC_ORIGIN" "$RUNNER_TEMP/release" "$RELEASE_COMMIT"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::Production verification failed. Review the run and rollback instructions.'
+          exit 1
+      - name: Record the release result
+        if: always()
+        shell: bash
+        env:
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+          RELEASE_RESULT: ${{ job.status }}
+          ROLLBACK_RUN_ID: ${{ inputs.rollback_run_id }}
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; fs.mkdirSync(process.env.RUNNER_TEMP + "/release-result", { recursive: true }); fs.writeFileSync(process.env.RUNNER_TEMP + "/release-result/deployment.json", JSON.stringify({ commit: process.env.RELEASE_COMMIT, workflowCommit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, restoredFromRun: process.env.ROLLBACK_RUN_ID || null, result: process.env.RELEASE_RESULT, url: process.env.PUBLIC_ORIGIN, recordedAt: new Date().toISOString() }, null, 2));'
+          printf '## Production release\n\nCommit: `%s`\n\nResult: **%s**\n\nApplication: %s\n\nA failed result requires investigation; no automatic rollback is performed.\n' "$RELEASE_COMMIT" "$RELEASE_RESULT" "$PUBLIC_ORIGIN" >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain deployment evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deployment-result
+          path: ${{ runner.temp }}/release-result
+          retention-days: 90
+          if-no-files-found: error

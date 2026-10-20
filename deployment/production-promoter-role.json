@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "roleName": "Pomodoro production promoter",
+    "description": "AI-assisted role definition, 2026-10-20. Read app and slot configuration and swap releases. No direct application publishing or configuration writes.",
+    "assignableScopes": [
+      "/subscriptions/70a0437a-dab0-4051-b428-0df0e508a51a/resourceGroups/res-group1"
+    ],
+    "permissions": [{
+      "actions": [
+        "Microsoft.Web/sites/read",
+        "Microsoft.Web/sites/config/read",
+        "Microsoft.Web/sites/slots/read",
+        "Microsoft.Web/sites/slots/config/read",
+        "Microsoft.Web/sites/operationresults/read",
+        "Microsoft.Web/sites/operations/read",
+        "Microsoft.Web/sites/slots/operationresults/read",
+        "Microsoft.Web/sites/slots/operations/read",
+        "Microsoft.Web/sites/slotsswap/action",
+        "Microsoft.Web/sites/slots/slotsswap/action"
+      ],
+      "notActions": [], "dataActions": [], "notDataActions": []
+    }]
+  }
+}

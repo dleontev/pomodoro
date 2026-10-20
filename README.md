@@ -54,24 +54,24 @@ The current session and cycle survive reloads. If completion is detected more th
 | `npm test` | Node's built-in test runner: manual/assisted/automatic sessions, custom lengths, cycle counts, preference storage, pause/reload/suspension recovery, duplicate-alert prevention, sound synthesis and asynchronous audio lifecycle, HTTP responses, security headers, and POSIX shutdown. The signal test is skipped on Windows. |
 | `npm run smoke` | Runs the actual `npm start` command in production mode on a temporary port, checks `/` and `/health`, then stops the test process tree. |
 
-Controller tests exercise the real application module with DOM, storage, notification, and Web Audio test doubles. Audio tests verify scheduling and lifecycle rather than perceived sound quality. Automated browser end-to-end tests and accessibility audits are not included.
+Controller tests exercise the real application module with DOM, storage, notification, and Web Audio test doubles. Audio tests verify scheduling and lifecycle rather than perceived sound quality. Release tests cover artifact integrity, rollback-run selection, and live HTTP verification against stale or changed files. Automated browser end-to-end tests and accessibility audits are not included.
 
-## CI and Azure deployment
+## CI and Azure releases
 
 GitHub Actions workflows target Node.js 24:
 
 | Workflow | Behavior |
 | --- | --- |
-| [CI](.github/workflows/ci.yml) | On pushes and pull requests to `main` or `dev`, or manual dispatch: locked dependency installation, syntax checks, tests, and production startup validation on Ubuntu. Actions are pinned to commit hashes; repository access is read-only. |
-| [Azure deployment](.github/workflows/main_testwebapp-aztestprep.yml) | On pushes to `main` or manual dispatch: installs locked dependencies and runs syntax, test, and production startup checks before uploading source and deploying it to the production App Service. |
+| [CI](.github/workflows/ci.yml) | On pushes and pull requests to `main` or `dev`, or manual dispatch: workflow lint, locked dependency installation, syntax checks, tests, and production startup validation on Ubuntu. |
+| [Release](.github/workflows/release.yml) | Validates a `main` commit, packages an identifiable release, deploys to the existing staging slot, and checks health and frontend hashes. Production approval permits a slot swap, followed by verification of production and its custom domain. Manual rollback can reuse a retained successful release artifact. |
 
-Deployment uses **OpenID Connect (OIDC)** through `azure/login`, exchanging a GitHub identity token for a temporary Azure access token via federated trust. Identifiers are referenced through GitHub secrets; no client secret or publish profile is used.
+The Azure slot is named `dev` and serves as **release staging**. Development branches feed reviewed pull requests into `main`; only `main` starts the release pipeline. The workflow serializes staging, approval, and promotion so a later run cannot replace a release awaiting approval. `main` can be ahead of production; the deployed `/release.json` and release summary identify the actual application commit.
 
-**Deployment is gated by validation in its own artifact job.** It does not wait for the separate CI workflow. Installed `node_modules` are excluded from the artifact; runtime dependency installation depends on App Service build configuration, which is managed outside these workflows.
+Deployment is gated by checks in the release workflow itself. Packaging allows only the server, package manifests, and public assets, with generated version/checksum metadata. Artifacts are retained for 90 days. Dependencies are installed by App Service in staging; swapping promotes that deployed application. Frontend hashes verify served bytes, not browser behavior or all backend code paths.
 
-Possible follow-ups: narrow production deployment packaging to an explicit source allowlist and add automated browser tests.
+Azure authentication uses **OIDC**, with separate staging and production identities and environment-specific trust. Client, tenant, and subscription IDs are environment variables; no client secret or publish profile is needed. Action releases are pinned to commit hashes. GitHub's production environment supplies the approval gate and main-only branch restriction.
 
-The `dev` branch runs CI only; its Azure deployment connection will be configured separately by the repository owner. See [development deployment setup](docs/development-deployment.md) for the existing slot, connection requirements, and promotion/rollback process. The production workflow is unchanged; its manual dispatch currently has no explicit branch guard.
+See the [release guide](docs/development-deployment.md) for repository protections, identity scopes, release verification, and rollback. Automated browser tests remain a possible improvement.
 
 ## Acknowledgment
 
