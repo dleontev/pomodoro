@@ -153,6 +153,27 @@ jobs:
           [[ -n "$app_plan" && "${app_plan,,}" == "${slot_plan,,}" ]] || { echo '::error::Slot must share the existing plan.'; exit 1; }
           auto_swap=$(az rest --method GET --url "https://management.azure.com$expected/config/web?api-version=$api_version" --query properties.autoSwapSlotName -o tsv --only-show-errors)
           [[ -z "$auto_swap" ]] || { echo '::error::Automatic slot swapping must be disabled.'; exit 1; }
+      - name: Report staging SCM access
+        shell: bash
+        env:
+          SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          slot="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Web/sites/$APP_NAME/slots/dev"
+          # Log rule actions only; omit addresses, settings values, and credentials.
+          az rest --method GET --url "https://management.azure.com$slot/config/web?api-version=2024-11-01" --query '{scmUsesMainRules:properties.scmIpSecurityRestrictionsUseMain,scmDefaultAction:properties.scmIpSecurityRestrictionsDefaultAction,scmRuleActions:properties.scmIpSecurityRestrictions[].action,mainDefaultAction:properties.ipSecurityRestrictionsDefaultAction,mainRuleActions:properties.ipSecurityRestrictions[].action}' -o json --only-show-errors
+          az rest --method GET --url "https://management.azure.com$slot/providers/Microsoft.Authorization/permissions?api-version=2022-04-01" --query "value[].actions[] | [?contains(@, 'publish')]" -o json --only-show-errors
+          scm_host=$(az rest --method GET --url "https://management.azure.com$slot?api-version=2024-11-01" --query "properties.enabledHostNames[?contains(@, '.scm.')] | [0]" -o tsv --only-show-errors)
+          [[ "$scm_host" == *'.scm.'* && "$scm_host" == *'.azurewebsites.net' ]] || { echo '::error::Unexpected SCM hostname.'; exit 1; }
+          curl --silent --show-error --max-time 20 --output /dev/null --dump-header "$RUNNER_TEMP/scm-headers.txt" --write-out 'Unauthenticated SCM HTTP: %{http_code}\n' "https://$scm_host/api/deployments"
+          if grep -qi '^x-ms-forbidden-ip:' "$RUNNER_TEMP/scm-headers.txt"; then
+            echo 'SCM rejected the runner IP address.'
+          fi
+          if az rest --method GET --url "https://$scm_host/api/deployments" --resource https://management.azure.com/ --output none --only-show-errors 2> "$RUNNER_TEMP/scm-auth-error.txt"; then
+            echo 'Authenticated SCM read succeeded.'
+          else
+            echo 'Authenticated SCM read failed; response details are retained only in the runner temporary directory.'
+          fi
       - name: Deploy exclusively to the staging slot
         uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383 # v3
         with:
