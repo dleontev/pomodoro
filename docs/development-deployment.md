@@ -51,6 +51,8 @@ The environment subjects do not include a branch; the main-only environment poli
 
 On the existing dev slot, retain Node.js **24 LTS**, use `npm start` or the established platform startup discovery, and preserve platform `PORT`. Source-only deployment requires `SCM_DO_BUILD_DURING_DEPLOYMENT=true`; use `NODE_ENV=production`. Preserve HTTPS/TLS and disabled basic publishing authentication. Keep production traffic at 100%, dev at 0%, and automatic swapping disabled.
 
+SCM access is verified separately from ARM metadata access. The staging role includes both `Microsoft.Web/sites/publish/action`, named in Microsoft's [Kudu access guidance](https://learn.microsoft.com/en-us/azure/app-service/resources-kudu#rbac-permissions-required-to-access-kudu), and the slot-specific publishing operation. Keep this role assigned only to `slots/dev`; assigning it on the parent app would also allow production publication. A role assignment or successful Azure sign-in alone does not establish that SCM deployment works: the staging deployment and content verification must pass before production approval is offered.
+
 Main-site access restrictions and SCM network reachability are separate. Any staging allowlist must allow the release runner's verification path; the supplied tester-only CIDR does not cover GitHub-hosted runners. The current workflow does not add temporary firewall exceptions. Network isolation changes need a reviewed runner/network design.
 
 ## Rollback
