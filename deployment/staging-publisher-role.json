@@ -14,7 +14,8 @@
         "Microsoft.Web/sites/slots/deployments/read",
         "Microsoft.Web/sites/slots/deployments/log/read",
         "Microsoft.Web/sites/slots/config/list/action",
-        "Microsoft.Web/sites/slots/publish/action"
+        "Microsoft.Web/sites/slots/publish/action",
+        "Microsoft.Web/sites/slots/publishxml/action"
       ],
       "notActions": [], "dataActions": [], "notDataActions": []
     }]
