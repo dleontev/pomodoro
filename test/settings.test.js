@@ -4,7 +4,7 @@
 // Generated: 2026-10-19
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_DURATIONS, loadAutoSwitch, saveAutoSwitch, loadDurations, saveDurations, validateDurations } from '../public/settings.js';
+import { DEFAULT_DURATIONS, loadAutoSwitch, saveAutoSwitch, loadAutoStart, saveAutoStart, loadDurations, saveDurations, validateDurations } from '../public/settings.js';
 
 test('session lengths accept whole minutes and reject invalid values atomically', () => {
   assert.deepEqual(validateDurations({ focus: '40', short: '7', long: '20' }).durations, { focus: 40, short: 7, long: 20 });
@@ -74,4 +74,20 @@ test('missing, malformed, and blocked auto-switch preferences default safely to 
   assert.equal(loadAutoSwitch(undefined), false);
   assert.equal(saveAutoSwitch(blocked, true), false);
   assert.equal(saveAutoSwitch(undefined, false), false);
+});
+
+test('auto-start defaults off, persists independently, and tolerates blocked storage', () => {
+  const entries = new Map();
+  const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value) };
+  assert.equal(loadAutoStart(storage), false);
+  saveAutoSwitch(storage, true);
+  assert.equal(loadAutoStart(storage), false);
+  assert.equal(saveAutoStart(storage, true), true);
+  assert.equal(loadAutoStart(storage), true);
+  saveAutoStart(storage, false);
+  assert.equal(loadAutoStart(storage), false);
+  assert.equal(loadAutoSwitch(storage), true);
+  assert.equal(loadAutoStart(undefined), false);
+  assert.equal(saveAutoStart(undefined, true), false);
+  assert.throws(() => saveAutoStart(storage, 'true'), TypeError);
 });

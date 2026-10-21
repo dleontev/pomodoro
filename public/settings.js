@@ -6,6 +6,16 @@ export const DEFAULT_DURATIONS = Object.freeze({ focus: 25, short: 5, long: 15 }
 export const DURATION_LIMITS = Object.freeze({ focus: 120, short: 60, long: 60 });
 const storageKey = 'pomodoro.durations.v1';
 const autoSwitchKey = 'pomodoro.auto-switch.v1';
+const autoStartKey = 'pomodoro.auto-start.v1';
+
+export function loadAutoStart(storage) {
+  try { return storage.getItem(autoStartKey) === 'true'; } catch { return false; }
+}
+
+export function saveAutoStart(storage, enabled) {
+  if (typeof enabled !== 'boolean') throw new TypeError('Auto-start must be a boolean');
+  try { storage.setItem(autoStartKey, String(enabled)); return true; } catch { return false; }
+}
 
 export function loadAutoSwitch(storage) {
   try { return storage.getItem(autoSwitchKey) === 'true'; } catch { return false; }

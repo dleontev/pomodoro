@@ -4,7 +4,7 @@
 // Generated: 2026-10-19
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PomodoroTimer } from '../public/timer.js';
+import { PomodoroTimer, COMPLETION_GRACE_MS } from '../public/timer.js';
 
 test('auto-switch defaults off and completion preserves manual mode selection', () => {
   const timer = new PomodoroTimer();
@@ -126,12 +126,12 @@ test('pause and resume preserve time and count a completion only after resumed e
   assert.equal(restored.sync(101440001), false);
 });
 
-test('pausing at the deadline switches once without leaving a paused zero-time session', () => {
+test('pausing at the deadline completes once without switching modes or starting another timer', () => {
   const timer = new PomodoroTimer(undefined, 0, undefined, { autoSwitch: true });
   timer.start(0);
   assert.equal(timer.pause(timer.deadline), true);
-  assert.equal(timer.mode, 'short');
-  assert.equal(timer.phase, 'ready');
+  assert.equal(timer.mode, 'focus');
+  assert.equal(timer.phase, 'complete');
   assert.equal(timer.pause(10000000), false);
   assert.equal(timer.completedFocus, 1);
 });
@@ -208,4 +208,100 @@ test('changed preferences affect the selected next session while the active dura
   timer.sync(timer.deadline);
   assert.equal(timer.mode, 'focus');
   assert.equal(timer.remainingMs, 2400000);
+});
+
+test('auto-start is off by default and cannot start a session without auto-switch', () => {
+  for (const options of [{}, { autoSwitch: true }, { autoStart: true }]) {
+    const timer = new PomodoroTimer(undefined, 0, undefined, options);
+    assert.equal(timer.autoStart, false);
+    timer.start(0);
+    timer.sync(timer.deadline);
+    assert.notEqual(timer.phase, 'running');
+  }
+});
+
+test('automatic starts use custom durations and follow four-focus long-break scheduling', () => {
+  const timer = new PomodoroTimer(undefined, 0, { focus: 2, short: 3, long: 4 }, { autoSwitch: true, autoStart: true });
+  timer.start(1000);
+  for (let focus = 1; focus <= 4; focus += 1) {
+    const completion = timer.deadline + 1200;
+    assert.equal(timer.sync(completion), true);
+    assert.equal(timer.completedFocus, focus);
+    assert.equal(timer.mode, focus === 4 ? 'long' : 'short');
+    assert.equal(timer.phase, 'running');
+    assert.equal(timer.remainingMs, focus === 4 ? 240000 : 180000);
+    assert.equal(timer.deadline, completion + timer.duration, 'starts from detection time, never an old deadline');
+    assert.equal(timer.sync(completion), false, 'another callback cannot duplicate a completion');
+    const breakEnd = timer.deadline;
+    assert.equal(timer.sync(breakEnd), true);
+    assert.equal(timer.mode, 'focus');
+    assert.equal(timer.phase, 'running');
+    assert.equal(timer.remainingMs, 120000);
+  }
+  assert.equal(timer.completedFocus, 4);
+  assert.equal(timer.cycleFocus, 0);
+});
+
+test('prolonged suspension and expired reloads select one ready session without catch-up cycles', () => {
+  const options = { autoSwitch: true, autoStart: true };
+  const timer = new PomodoroTimer(undefined, 0, undefined, options);
+  timer.start(1000);
+  const snapshot = timer.snapshot();
+  const afterSleep = timer.deadline + COMPLETION_GRACE_MS + 1;
+  assert.equal(timer.sync(afterSleep), true);
+  assert.equal(timer.mode, 'short');
+  assert.equal(timer.phase, 'ready');
+  assert.equal(timer.sync(afterSleep + 100000000), false);
+  assert.equal(timer.completedFocus, 1);
+  const reload = new PomodoroTimer(snapshot, snapshot.deadline, undefined, options);
+  assert.equal(reload.sync(snapshot.deadline, { allowAutoStart: false }), true);
+  assert.equal(reload.phase, 'ready');
+  assert.equal(reload.completedFocus, 1);
+  assert.equal(reload.sync(snapshot.deadline + 1), false);
+});
+
+test('manual controls and automation changes retain control of automatically started timers', () => {
+  const timer = new PomodoroTimer(undefined, 0, undefined, { autoSwitch: true, autoStart: true });
+  timer.start(1000);
+  timer.sync(timer.deadline);
+  const deadline = timer.deadline;
+  timer.start(deadline - 1000);
+  assert.equal(timer.deadline, deadline, 'repeated Start cannot replace a running deadline');
+  timer.pause(deadline - 2000);
+  assert.equal(timer.phase, 'paused');
+  const restored = new PomodoroTimer(timer.snapshot(), deadline + 100000, timer.durations, { autoSwitch: true, autoStart: true });
+  assert.equal(restored.phase, 'paused');
+  assert.equal(restored.sync(deadline + 1000000), false);
+  restored.start(deadline + 1000000);
+  restored.autoStart = false;
+  restored.sync(restored.deadline);
+  assert.equal(restored.mode, 'focus');
+  assert.equal(restored.phase, 'ready');
+  restored.autoStart = true;
+  assert.equal(restored.sync(1000000000), false, 'enabling does not start an already selected session');
+  restored.selectMode('long');
+  assert.equal(restored.phase, 'ready');
+  restored.start(1000000000);
+  restored.reset();
+  assert.equal(restored.sync(2000000000), false);
+  assert.equal(restored.completedFocus, 1);
+});
+
+test('reloading an automatically started countdown retains its deadline and completion feedback', () => {
+  const options = { autoSwitch: true, autoStart: true };
+  const timer = new PomodoroTimer(undefined, 0, undefined, options);
+  timer.start(1000);
+  timer.sync(timer.deadline);
+  const restored = new PomodoroTimer(timer.snapshot(), timer.deadline - 1000, timer.durations, options);
+  assert.equal(restored.phase, 'running');
+  assert.equal(restored.transitionFrom, 'focus');
+  assert.equal(restored.deadline, timer.deadline);
+  assert.equal(restored.completedFocus, 1);
+  assert.equal(restored.sync(timer.deadline - 1000), false);
+  assert.equal(restored.remainingMs, 1000);
+  restored.autoSwitch = false;
+  restored.sync(timer.deadline);
+  assert.equal(restored.mode, 'short');
+  assert.equal(restored.phase, 'complete');
+  assert.equal(restored.transitionFrom, null, 'completion clears feedback from the previous automatic transition');
 });

@@ -11,6 +11,7 @@ dist/
 build/
 out/
 coverage/
+public/release.json
 .nyc_output/
 test-results/
 playwright-report/

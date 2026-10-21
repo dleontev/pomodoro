@@ -3,14 +3,15 @@
 # Purpose: Pin validation actions to verified release commits.
 # Prepared for review by: Dimitriy Leontev
 # Generated: 2026-10-19
-# Validation only. Azure Deployment Center owns the deployment workflow.
+# AI-assisted release validation with OpenAI Codex, 2026-10-20.
+# Validation only. release.yml owns staging deployment and production promotion.
 name: Node.js CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +36,16 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
+
+      - name: Lint GitHub Actions workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl --fail --silent --show-error --location --output "$archive" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          printf '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  %s\n' "$archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -shellcheck= -pyflakes=
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts --no-fund

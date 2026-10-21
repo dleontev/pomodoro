@@ -70,7 +70,11 @@
 
         <div class="session-setting">
           <input type="checkbox" id="auto-switch" aria-describedby="auto-switch-help">
-          <div><label for="auto-switch">Auto-switch sessions</label><p id="auto-switch-help">Select the next session automatically. Timers always start manually.</p></div>
+          <div><label for="auto-switch">Auto-switch sessions</label><p id="auto-switch-help">Select the next focus or break session when time is up.</p></div>
+        </div>
+        <div class="session-setting">
+          <input type="checkbox" id="auto-start" aria-describedby="auto-start-help" disabled>
+          <div><label for="auto-start">Auto-start next session</label><p id="auto-start-help">Turn on Auto-switch to enable automatic countdowns.</p></div>
         </div>
         <div class="session-setting">
           <input type="checkbox" id="notifications" aria-describedby="notification-help">
@@ -103,6 +107,24 @@
           </div>
           <p id="sound-status" class="helper sound-status" role="status" aria-live="polite">Sounds are off. Choose one for focus or breaks.</p>
           <button id="sound-resume" class="text-button" type="button" hidden>Enable sound</button>
+        </section>
+
+        <section class="notification-panel panel" aria-labelledby="notification-sound-title">
+          <div class="panel-heading"><h2 id="notification-sound-title">Session notification sound</h2></div>
+          <p class="helper panel-intro" id="notification-sound-help">A brief sound when time is up. Preview a choice, then save it.</p>
+          <div class="sound-selectors notification-selector">
+            <div><label for="notification-sound">Sound to preview</label><select id="notification-sound" aria-describedby="notification-sound-help"><option value="off">Off</option><option value="chime">Soft Chime</option><option value="bell">Bell</option><option value="digital">Digital Tone</option><option value="wood">Wooden Chime</option><option value="melody">Ascending Melody</option></select></div>
+          </div>
+          <div class="notification-actions">
+            <button id="notification-preview" class="button button-secondary" type="button" disabled>Preview sound</button>
+            <button id="notification-save" class="button button-secondary" type="button" disabled>Use sound</button>
+          </div>
+          <div class="sound-volume-heading"><label for="notification-volume">Notification volume</label><output id="notification-volume-value" for="notification-volume">40%</output></div>
+          <div class="sound-volume-controls">
+            <input id="notification-volume" type="range" min="0" max="100" value="40" step="1" aria-valuetext="40 percent">
+            <button id="notification-mute" class="button button-secondary" type="button" aria-label="Mute notification sounds" aria-pressed="false">Mute</button>
+          </div>
+          <p id="notification-sound-status" class="helper sound-status" role="status" aria-live="polite" aria-atomic="true">Session sounds are off. Ambient sound has its own controls.</p>
         </section>
 
         <details class="duration-panel panel">
