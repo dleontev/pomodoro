@@ -142,13 +142,16 @@ jobs:
           SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
         run: |
           set -euo pipefail
-          expected="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Web/sites/$APP_NAME/slots/dev"
-          slot=$(az webapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --slot dev --query id -o tsv --only-show-errors)
+          app="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Web/sites/$APP_NAME"
+          expected="$app/slots/dev"
+          # Read ARM metadata directly; webapp show also requests a publishing profile.
+          api_version=2024-11-01
+          slot=$(az rest --method GET --url "https://management.azure.com$expected?api-version=$api_version" --query id -o tsv --only-show-errors)
           [[ "${slot,,}" == "${expected,,}" ]] || { echo '::error::Unexpected deployment target.'; exit 1; }
-          app_plan=$(az webapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --query serverFarmId -o tsv --only-show-errors)
-          slot_plan=$(az webapp show -g "$RESOURCE_GROUP" -n "$APP_NAME" --slot dev --query serverFarmId -o tsv --only-show-errors)
+          app_plan=$(az rest --method GET --url "https://management.azure.com$app?api-version=$api_version" --query properties.serverFarmId -o tsv --only-show-errors)
+          slot_plan=$(az rest --method GET --url "https://management.azure.com$expected?api-version=$api_version" --query properties.serverFarmId -o tsv --only-show-errors)
           [[ -n "$app_plan" && "${app_plan,,}" == "${slot_plan,,}" ]] || { echo '::error::Slot must share the existing plan.'; exit 1; }
-          auto_swap=$(az webapp config show -g "$RESOURCE_GROUP" -n "$APP_NAME" --slot dev --query autoSwapSlotName -o tsv --only-show-errors)
+          auto_swap=$(az rest --method GET --url "https://management.azure.com$expected/config/web?api-version=$api_version" --query properties.autoSwapSlotName -o tsv --only-show-errors)
           [[ -z "$auto_swap" ]] || { echo '::error::Automatic slot swapping must be disabled.'; exit 1; }
       - name: Deploy exclusively to the staging slot
         uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383 # v3
