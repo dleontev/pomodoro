@@ -169,11 +169,20 @@ jobs:
           if grep -qi '^x-ms-forbidden-ip:' "$RUNNER_TEMP/scm-headers.txt"; then
             echo 'SCM rejected the runner IP address.'
           fi
-          if az rest --method GET --url "https://$scm_host/api/deployments" --resource https://management.azure.com/ --output none --only-show-errors 2> "$RUNNER_TEMP/scm-auth-error.txt"; then
-            echo 'Authenticated SCM read succeeded.'
-          else
-            echo 'Authenticated SCM read failed; response details are retained only in the runner temporary directory.'
-          fi
+          for audience in https://management.azure.com/ https://management.core.windows.net/; do
+            if az rest --method GET --url "https://$scm_host/api/deployments" --resource "$audience" --output none --only-show-errors 2> "$RUNNER_TEMP/scm-auth-error.txt"; then
+              printf 'Authenticated SCM read succeeded (%s).\n' "$audience"
+            else
+              # Never print the response body: extract only known error categories and provider operations.
+              printf 'Authenticated SCM read failed (%s).\n' "$audience"
+              for category in Forbidden Unauthorized AuthorizationFailed InvalidAuthenticationToken; do
+                if grep -qi "$category" "$RUNNER_TEMP/scm-auth-error.txt"; then
+                  printf 'SCM error category: %s\n' "$category"
+                fi
+              done
+              grep -Eo 'Microsoft\.[A-Za-z0-9_.]+(/[A-Za-z0-9_.-]+)+' "$RUNNER_TEMP/scm-auth-error.txt" | sort -u || true
+            fi
+          done
       - name: Deploy exclusively to the staging slot
         uses: azure/webapps-deploy@02a81bead70021f5284939794bcec79c271ab383 # v3
         with:
