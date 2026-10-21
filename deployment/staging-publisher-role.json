@@ -1,7 +1,7 @@
 {
   "properties": {
     "roleName": "Pomodoro staging publisher",
-    "description": "AI-assisted role definition, 2026-10-20. Publish the dev slot without slot swaps or site configuration writes. Assign only at the dev slot.",
+    "description": "AI-assisted role definition, 2026-10-21. Publish the dev slot without slot swaps or site configuration writes. Includes the SCM publish operation. Assign only at the dev slot, never the parent app.",
     "assignableScopes": [
       "/subscriptions/70a0437a-dab0-4051-b428-0df0e508a51a/resourceGroups/res-group1"
     ],
@@ -14,6 +14,7 @@
         "Microsoft.Web/sites/slots/deployments/read",
         "Microsoft.Web/sites/slots/deployments/log/read",
         "Microsoft.Web/sites/slots/config/list/action",
+        "Microsoft.Web/sites/publish/action",
         "Microsoft.Web/sites/slots/publish/action",
         "Microsoft.Web/sites/slots/publishxml/action"
       ],
