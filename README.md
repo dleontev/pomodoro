@@ -69,7 +69,7 @@ The Azure slot is named `dev` and serves as **release staging**. Development bra
 
 Deployment is gated by checks in the release workflow itself. Packaging allows only the server, package manifests, and public assets, with generated version/checksum metadata. Artifacts are retained for 90 days. Dependencies are installed by App Service in staging; swapping promotes that deployed application. Frontend hashes verify served bytes, not browser behavior or all backend code paths.
 
-Azure authentication uses **OIDC**, with separate staging and production identities and environment-specific trust. Client, tenant, and subscription IDs are environment variables; no client secret or publish profile is needed. Action releases are pinned to commit hashes. GitHub's production environment supplies the approval gate and main-only branch restriction.
+Azure authentication uses **OIDC**, with separate staging and production identities and environment-specific trust. Client, tenant, and subscription IDs are environment variables; no client secret or stored publish profile is configured. Action releases are pinned to commit hashes. GitHub's production environment supplies the approval gate and main-only branch restriction.
 
 See the [release guide](docs/development-deployment.md) for repository protections, identity scopes, release verification, and rollback. Automated browser tests remain a possible improvement.
 
